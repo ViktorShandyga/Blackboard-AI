@@ -1,7 +1,13 @@
 import { motion } from 'motion/react';
 import { Lock } from 'lucide-react';
-import { getAchievements } from '@/lib/achievements';
+import { getAchievements, rarityLabel, type Rarity } from '@/lib/achievements';
 import type { Progress } from '@/lib/progressStorage';
+
+const RARITY_TEXT: Record<Rarity, string> = {
+  bronze: 'text-amber-300',
+  silver: 'text-slate-300',
+  gold: 'text-yellow-300',
+};
 
 interface AchievementsPanelProps {
   progress: Progress;
@@ -55,6 +61,9 @@ export function AchievementsPanel({ progress }: AchievementsPanelProps) {
                 {achievement.title}
               </span>
               <span className="text-xs leading-snug text-silver">{achievement.description}</span>
+              <span className={`mt-auto text-[9px] font-semibold uppercase tracking-[0.18em] ${achievement.unlocked ? RARITY_TEXT[achievement.rarity] : 'text-silver/40'}`}>
+                {rarityLabel(achievement.rarity)}
+              </span>
             </motion.li>
           );
         })}

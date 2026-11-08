@@ -1,5 +1,7 @@
 import { MotionConfig } from 'motion/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AchievementToast } from '@/components/common/AchievementToast';
+import { getAchievements, type Achievement } from '@/lib/achievements';
 import { ErrorNotice } from '@/components/home/ErrorNotice';
 import { HomePage } from '@/components/home/HomePage';
 import { LessonView } from '@/components/lesson/LessonView';
@@ -48,6 +50,42 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMusicOpen, setIsMusicOpen] = useState(false);
   const player = useMusicPlayer();
+  const [achievementToasts, setAchievementToasts] = useState<Achievement[]>([]);
+  const progressScanCount = useRef(0);
+
+  useEffect(() => {
+    const isFirstScan = progressScanCount.current === 0;
+    progressScanCount.current += 1;
+
+    const fresh = getAchievements(progress).filter(
+      (achievement) => achievement.unlocked && !progress.unlockedAchievements[achievement.id],
+    );
+    if (fresh.length === 0) return;
+
+    // Persist unlock stamps the moment an achievement becomes unlocked.
+    setProgress((prev) => {
+      const stamp = new Date().toISOString();
+      const stamps = Object.fromEntries(fresh.map((item) => [item.id, stamp]));
+      const next = { ...prev, unlockedAchievements: { ...prev.unlockedAchievements, ...stamps } };
+      saveProgress(next);
+      return next;
+    });
+
+    // Silently migrate already-earned achievements on the very first scan after the update.
+    if (!isFirstScan) setAchievementToasts(fresh);
+  }, [progress]);
+
+  useEffect(() => {
+    if (achievementToasts.length === 0) return;
+    const timers = achievementToasts.map((toast) =>
+      window.setTimeout(() => dismissAchievementToast(toast.id), 7000),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [achievementToasts]);
+
+  const dismissAchievementToast = (id: string) => {
+    setAchievementToasts((current) => current.filter((toast) => toast.id !== id));
+  };
 
   const selectedSubject = subjectId ? getSubject(subjectId) : undefined;
 
@@ -149,7 +187,7 @@ export default function App() {
 
   const handleFinish = (results: TaskResult[]) => {
     if (screen.kind !== 'lesson') return;
-    const next = recordLesson(progress, screen.session.subjectId, results);
+    const next = recordLesson(progress, screen.session.subjectId, results, screen.session.tasks);
     setProgress(next);
     saveProgress(next);
     setScreen({ kind: 'summary', session: screen.session, results });
@@ -278,6 +316,8 @@ export default function App() {
       ) : null}
 
       <MusicPlayer {...player} isOpen={isMusicOpen} onClose={() => setIsMusicOpen(false)} />
+
+      <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
     </div>
     </MotionConfig>
   );
