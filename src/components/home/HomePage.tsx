@@ -1,4 +1,5 @@
 import { AchievementsPanel } from '@/components/home/AchievementsPanel';
+import { DailyQuestsPanel } from '@/components/home/DailyQuestsPanel';
 import { LampIllustration } from '@/components/home/LampIllustration';
 import { LessonSetup } from '@/components/home/LessonSetup';
 import { SubjectGrid } from '@/components/home/SubjectGrid';
@@ -108,6 +109,8 @@ export function HomePage({
           </div>
         ) : null}
       </section>
+
+      <DailyQuestsPanel progress={progress} />
 
       <AchievementsPanel progress={progress} />
     </div>

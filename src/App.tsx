@@ -1,7 +1,9 @@
 import { MotionConfig } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { AchievementToast } from '@/components/common/AchievementToast';
+import { QuestToast, type DailyQuestToast } from '@/components/common/QuestToast';
 import { getAchievements, type Achievement } from '@/lib/achievements';
+import { applyDailyQuestRewards, selectDailyQuestIds } from '@/lib/dailyQuests';
 import { ErrorNotice } from '@/components/home/ErrorNotice';
 import { HomePage } from '@/components/home/HomePage';
 import { LessonView } from '@/components/lesson/LessonView';
@@ -15,7 +17,7 @@ import { clearApiKey, loadApiKey, saveApiKey } from '@/lib/apiKeyStorage';
 import { buildLocalLesson } from '@/lib/localLesson';
 import { generateAiLesson } from '@/lib/lessonAi';
 import { DEFAULT_MODEL_ID, loadModelId, saveModelId } from '@/lib/openrouterModels';
-import { loadProgress, recordLesson, saveProgress, type Progress } from '@/lib/progressStorage';
+import { dateKey, loadProgress, recordLesson, saveProgress, type Progress } from '@/lib/progressStorage';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import type {
   LessonFocus,
@@ -86,6 +88,29 @@ export default function App() {
   const dismissAchievementToast = (id: string) => {
     setAchievementToasts((current) => current.filter((toast) => toast.id !== id));
   };
+
+  const [questToasts, setQuestToasts] = useState<DailyQuestToast[]>([]);
+
+  // Reset quest toasts that outlived the daily rollover.
+  useEffect(() => {
+    if (progress.dailyQuests?.date === dateKey()) return;
+    setProgress((prev) => {
+      if (prev.dailyQuests?.date === dateKey()) return prev;
+      const next = { ...prev, dailyQuests: { date: dateKey(), ids: selectDailyQuestIds(dateKey()), rewardsClaimed: [] } };
+      saveProgress(next);
+      return next;
+    });
+  }, [progress]);
+
+  const dismissQuestToast = (id: string) => {
+    setQuestToasts((current) => current.filter((toast) => toast.id !== id));
+  };
+
+  useEffect(() => {
+    if (questToasts.length === 0) return;
+    const timers = questToasts.map((toast) => window.setTimeout(() => dismissQuestToast(toast.id), 7000));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [questToasts]);
 
   const selectedSubject = subjectId ? getSubject(subjectId) : undefined;
 
@@ -187,9 +212,22 @@ export default function App() {
 
   const handleFinish = (results: TaskResult[]) => {
     if (screen.kind !== 'lesson') return;
-    const next = recordLesson(progress, screen.session.subjectId, results, screen.session.tasks);
+    const recorded = recordLesson(progress, screen.session.subjectId, results, screen.session.tasks);
+    const { progress: next, completed } = applyDailyQuestRewards(recorded);
     setProgress(next);
     saveProgress(next);
+    if (completed.length > 0) {
+      setQuestToasts((current) => [
+        ...current,
+        ...completed.map((quest) => ({
+          id: quest.id,
+          title: quest.title,
+          description: quest.description,
+          icon: quest.icon,
+          reward: quest.reward,
+        })),
+      ]);
+    }
     setScreen({ kind: 'summary', session: screen.session, results });
   };
 
@@ -318,6 +356,7 @@ export default function App() {
       <MusicPlayer {...player} isOpen={isMusicOpen} onClose={() => setIsMusicOpen(false)} />
 
       <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
+      <QuestToast toasts={questToasts} onDismiss={dismissQuestToast} />
     </div>
     </MotionConfig>
   );

@@ -1,4 +1,5 @@
 import type { Level, SubjectId, TaskResult } from '@/types/learning';
+import type { DailyQuestState } from '@/lib/dailyQuests';
 
 const PROGRESS_STORAGE_KEY = 'blackboard-ai:progress';
 
@@ -32,6 +33,12 @@ export interface Progress {
   nightAnswers: number;
   /** Tasks answered between 05:00 and 08:00. */
   dawnAnswers: number;
+  /** Correct answers per local day ('YYYY-MM-DD'). */
+  dailyCorrect: Record<string, number>;
+  /** Subjects practised per local day ('YYYY-MM-DD'). */
+  dailySubjects: Record<string, SubjectId[]>;
+  /** Today's quest selection and claimed rewards. */
+  dailyQuests: DailyQuestState;
 }
 
 export const POINTS_PER_CORRECT = 10;
@@ -53,6 +60,9 @@ export const EMPTY_PROGRESS: Progress = {
   bestQuickRound: 0,
   nightAnswers: 0,
   dawnAnswers: 0,
+  dailyCorrect: {},
+  dailySubjects: {},
+  dailyQuests: { date: '', ids: [], rewardsClaimed: [] },
 };
 
 export function loadProgress(): Progress {
@@ -92,6 +102,16 @@ export function recordLesson(
   const nextDailyAnswered = { ...progress.dailyAnswered };
   nextDailyAnswered[today] = (nextDailyAnswered[today] ?? 0) + results.length;
 
+  const nextDailyCorrect = { ...progress.dailyCorrect };
+  nextDailyCorrect[today] = (nextDailyCorrect[today] ?? 0) + correct;
+
+  const nextDailySubjects = { ...progress.dailySubjects };
+  if (results.length > 0) {
+    const todaySubjects = new Set(nextDailySubjects[today] ?? []);
+    todaySubjects.add(subjectId);
+    nextDailySubjects[today] = [...todaySubjects];
+  }
+
   const nextActiveDays = progress.activeDays.includes(today)
     ? progress.activeDays
     : [...progress.activeDays, today].sort();
@@ -122,6 +142,9 @@ export function recordLesson(
     bestQuickRound: Math.max(progress.bestQuickRound, quickRound),
     nightAnswers: progress.nightAnswers + (hour >= 22 || hour < 5 ? results.length : 0),
     dawnAnswers: progress.dawnAnswers + (hour >= 5 && hour < 8 ? results.length : 0),
+    dailyCorrect: nextDailyCorrect,
+    dailySubjects: nextDailySubjects,
+    dailyQuests: progress.dailyQuests,
   };
 }
 
