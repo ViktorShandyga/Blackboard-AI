@@ -11,7 +11,7 @@ export class OpenRouterError extends Error {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user';
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
@@ -46,7 +46,7 @@ export async function requestChatCompletion(
 
 export type ConnectionTestResult = { ok: true; reply: string } | { ok: false; message: string };
 
-function describeFailure(error: unknown): string {
+export function describeFailure(error: unknown): string {
   if (error instanceof OpenRouterError) {
     if (error.status === 401 || error.status === 403) return 'Ключ не підходить. Перевір, що він скопійований повністю.';
     if (error.status === 429) return 'Ліміт безкоштовних запитів вичерпано. Спробуй трохи пізніше.';

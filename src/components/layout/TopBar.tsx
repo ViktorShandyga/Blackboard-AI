@@ -1,4 +1,4 @@
-import { BookMarked, Lightbulb, Music, Settings, Trophy } from 'lucide-react';
+import { AudioLines, BookMarked, Lightbulb, Music, Settings, Trophy } from 'lucide-react';
 import { CountUp } from '@/components/common/CountUp';
 
 interface TopBarProps {
@@ -9,9 +9,10 @@ interface TopBarProps {
   onOpenSettings: () => void;
   onOpenNotes: () => void;
   onOpenMusic: () => void;
+  onOpenVoice: () => void;
 }
 
-export function TopBar({ totalPoints, isConnected, isMusicPlaying, onHome, onOpenSettings, onOpenNotes, onOpenMusic }: TopBarProps) {
+export function TopBar({ totalPoints, isConnected, isMusicPlaying, onHome, onOpenSettings, onOpenNotes, onOpenMusic, onOpenVoice }: TopBarProps) {
   return (
     <header className="sticky top-0 z-30 px-3 pt-3 sm:px-6">
       <div className="relative mx-auto h-16 max-w-6xl rounded-2xl border border-white/[0.08] bg-canvas/75 px-3 shadow-glass backdrop-blur-2xl sm:px-4">
@@ -56,6 +57,14 @@ export function TopBar({ totalPoints, isConnected, isMusicPlaying, onHome, onOpe
             </span>
             <span className="hidden text-silver sm:inline">балів</span>
           </div>
+          <button
+            type="button"
+            onClick={onOpenVoice}
+            className="icon-button h-9 w-9"
+            aria-label="Голосовий AI"
+          >
+            <AudioLines className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={onOpenMusic}

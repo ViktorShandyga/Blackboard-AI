@@ -18,6 +18,7 @@ import { buildLocalLesson } from '@/lib/localLesson';
 import { generateAiLesson } from '@/lib/lessonAi';
 import { DEFAULT_MODEL_ID, loadModelId, saveModelId } from '@/lib/openrouterModels';
 import { dateKey, loadProgress, recordLesson, saveProgress, type Progress } from '@/lib/progressStorage';
+import { VoiceAIPage } from '@/components/voice/VoiceAIPage';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import type {
   LessonFocus,
@@ -35,7 +36,8 @@ type Screen =
   | { kind: 'home' }
   | { kind: 'lesson'; session: LessonSession }
   | { kind: 'summary'; session: LessonSession; results: TaskResult[] }
-  | { kind: 'notes' };
+  | { kind: 'notes' }
+  | { kind: 'voice' };
 
 export default function App() {
   const [progress, setProgress] = useState<Progress>(loadProgress);
@@ -188,6 +190,11 @@ export default function App() {
     setScreen({ kind: 'notes' });
   };
 
+  const handleOpenVoice = () => {
+    setErrorMessage(null);
+    setScreen({ kind: 'voice' });
+  };
+
   const handleSelectSubject = (id: SubjectId) => {
     setSubjectId(id);
     setFocus({ kind: 'mix' });
@@ -286,6 +293,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenNotes={handleOpenNotes}
         onOpenMusic={() => setIsMusicOpen(true)}
+        onOpenVoice={handleOpenVoice}
       />
 
       <main className="relative mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
@@ -325,6 +333,14 @@ export default function App() {
                 session={screen.session}
                 onExit={() => setScreen({ kind: 'home' })}
                 onFinish={handleFinish}
+              />
+            ) : null}
+
+            {screen.kind === 'voice' ? (
+              <VoiceAIPage
+                apiKey={apiKey}
+                model={model}
+                onOpenSettings={() => setIsSettingsOpen(true)}
               />
             ) : null}
 
