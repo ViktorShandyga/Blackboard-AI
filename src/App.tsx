@@ -17,6 +17,7 @@ import { clearApiKey, loadApiKey, saveApiKey } from '@/lib/apiKeyStorage';
 import { buildLocalLesson } from '@/lib/localLesson';
 import { generateAiLesson } from '@/lib/lessonAi';
 import { DEFAULT_MODEL_ID, loadModelId, saveModelId } from '@/lib/openrouterModels';
+import { CALCULATOR_XP_COST } from '@/lib/calculator';
 import { dateKey, loadProgress, recordLesson, saveProgress, type Progress } from '@/lib/progressStorage';
 import { VoiceAIPage } from '@/components/voice/VoiceAIPage';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
@@ -273,6 +274,15 @@ export default function App() {
     setApiKey('');
   };
 
+  /** Списує XP за активацію калькулятора під час заняття з математики або фізики. */
+  const handleActivateCalculator = () => {
+    if (progress.totalPoints < CALCULATOR_XP_COST) return false;
+    const next = { ...progress, totalPoints: progress.totalPoints - CALCULATOR_XP_COST };
+    setProgress(next);
+    saveProgress(next);
+    return true;
+  };
+
   return (
     <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden">
@@ -333,6 +343,16 @@ export default function App() {
                 session={screen.session}
                 onExit={() => setScreen({ kind: 'home' })}
                 onFinish={handleFinish}
+                calculator={
+                  screen.session.subjectId === 'math' || screen.session.subjectId === 'physics'
+                    ? { totalPoints: progress.totalPoints, onActivate: handleActivateCalculator }
+                    : undefined
+                }
+                voice={{
+                  apiKey,
+                  model,
+                  onOpenSettings: () => setIsSettingsOpen(true),
+                }}
               />
             ) : null}
 

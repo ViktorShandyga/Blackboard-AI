@@ -91,9 +91,9 @@ function saveSettings(settings: VoiceSettings): void {
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-function loadChat(): VoiceMessage[] {
+function loadChatFrom(storageKey: string): VoiceMessage[] {
   try {
-    const raw = window.localStorage.getItem(CHAT_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -110,14 +110,21 @@ function loadChat(): VoiceMessage[] {
   }
 }
 
-function saveChat(messages: VoiceMessage[]): void {
-  window.localStorage.setItem(CHAT_KEY, JSON.stringify(messages.slice(-CHAT_LIMIT)));
+function saveChatTo(storageKey: string, messages: VoiceMessage[]): void {
+  window.localStorage.setItem(storageKey, JSON.stringify(messages.slice(-CHAT_LIMIT)));
 }
 
 let messageSeq = 0;
 function nextMessageId(role: string): string {
   messageSeq += 1;
   return `${role}-${Date.now()}-${messageSeq}`;
+}
+
+export interface VoiceTutorOptions {
+  /** Ключ localStorage для історії; null — сесійний діалог без збереження. За замовчуванням — спільна історія сторінки Voice AI. */
+  storageKey?: string | null;
+  /** Динамічний контекст (тема уроку тощо), що додається до системного промпта перед кожним запитом. */
+  contextPrompt?: () => string;
 }
 
 export interface VoiceTutor {
@@ -142,12 +149,14 @@ export function isSpeechSupported(): boolean {
   return getRecognitionCtor() !== null && 'speechSynthesis' in window;
 }
 
-export function useVoiceTutor(apiKey: string, model: string): VoiceTutor {
+export function useVoiceTutor(apiKey: string, model: string, options?: VoiceTutorOptions): VoiceTutor {
+  const storageKey = options?.storageKey === undefined ? CHAT_KEY : options.storageKey;
+
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [micEnabled, setMicEnabled] = useState(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<VoiceMessage[]>(loadChat);
+  const [messages, setMessages] = useState<VoiceMessage[]>(() => (storageKey ? loadChatFrom(storageKey) : []));
   const [settings, setSettings] = useState<VoiceSettings>(loadSettings);
 
   const statusRef = useRef(status);
@@ -162,6 +171,8 @@ export function useVoiceTutor(apiKey: string, model: string): VoiceTutor {
   modelRef.current = model;
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+  const contextRef = useRef<VoiceTutorOptions['contextPrompt']>(options?.contextPrompt);
+  contextRef.current = options?.contextPrompt;
 
   const voiceLevelRef = useRef(0);
 
@@ -174,7 +185,9 @@ export function useVoiceTutor(apiKey: string, model: string): VoiceTutor {
   const finalBufferRef = useRef('');
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => saveChat(messagesRef.current), [messages]);
+  useEffect(() => {
+    if (storageKey) saveChatTo(storageKey, messagesRef.current);
+  }, [messages, storageKey]);
   useEffect(() => saveSettings(settings), [settings]);
 
   /* Прогрів списку голосів TTS (Chrome постачає їх асинхронно). */
@@ -285,6 +298,7 @@ export function useVoiceTutor(apiKey: string, model: string): VoiceTutor {
           modelRef.current,
           next.map((message) => ({ role: message.role, content: message.text })),
           controller.signal,
+          contextRef.current?.(),
         );
         const assistantMessage: VoiceMessage = {
           id: nextMessageId('assistant'),
@@ -469,13 +483,13 @@ export function useVoiceTutor(apiKey: string, model: string): VoiceTutor {
   const clearHistory = useCallback(() => {
     abortRef.current?.abort();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    window.localStorage.removeItem(CHAT_KEY);
+    if (storageKey) window.localStorage.removeItem(storageKey);
     finalBufferRef.current = '';
     setInterim('');
     setMessages([]);
     setError(null);
     if (!micRef.current) setStatus('idle');
-  }, []);
+  }, [storageKey]);
 
   const startMicRef = useRef(startMic);
   startMicRef.current = startMic;

@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, Bot, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { AiCompanion } from '@/components/lesson/AiCompanion';
+import { CalculatorGate } from '@/components/lesson/CalculatorGate';
+import { LessonVoiceOrb } from '@/components/lesson/LessonVoiceOrb';
 import { LessonProgress } from '@/components/lesson/LessonProgress';
 import { MaterialCard } from '@/components/lesson/MaterialCard';
 import { StreakBadge } from '@/components/lesson/StreakBadge';
@@ -13,6 +15,17 @@ interface LessonViewProps {
   session: LessonSession;
   onExit: () => void;
   onFinish: (results: TaskResult[]) => void;
+  /** Опційний XP-калькулятор (math/physics): передається з App. */
+  calculator?: {
+    totalPoints: number;
+    onActivate: () => boolean;
+  };
+  /** Літаючий голосовий помічник: доступний у будь-якому занятті. */
+  voice?: {
+    apiKey: string;
+    model: string;
+    onOpenSettings: () => void;
+  };
 }
 
 function trailingStreak(results: TaskResult[]): number {
@@ -31,10 +44,12 @@ function companionMessage(lastResult: TaskResult | undefined, streak: number): s
   return streak >= 3 ? `Оце рівень! Серія ${streak} поспіль.` : 'Ти розніс це завдання!';
 }
 
-export function LessonView({ session, onExit, onFinish }: LessonViewProps) {
+export function LessonView({ session, onExit, onFinish, calculator, voice }: LessonViewProps) {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [results, setResults] = useState<TaskResult[]>([]);
+  // Замок відкривається один раз на заняття: далі кнопка активації одразу на місці.
+  const [calcUnlocked, setCalcUnlocked] = useState(false);
 
   const task = session.tasks[index];
   const total = session.tasks.length;
@@ -137,6 +152,30 @@ export function LessonView({ session, onExit, onFinish }: LessonViewProps) {
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </button>
         </motion.div>
+      ) : null}
+
+      {calculator && (calcUnlocked || seconds >= 15) ? (
+        // Замок + 15 с — лише на першому завданні заняття; далі кнопка одразу.
+        // Ключ = id завдання: XP-активація скидається на кожному новому завданні.
+        <CalculatorGate
+          key={task.id}
+          totalPoints={calculator.totalPoints}
+          onActivate={calculator.onActivate}
+          locked={!calcUnlocked}
+          onUnlocked={() => setCalcUnlocked(true)}
+        />
+      ) : null}
+
+      {voice ? (
+        <LessonVoiceOrb
+          apiKey={voice.apiKey}
+          model={voice.model}
+          subjectName={session.subjectName}
+          focusTitle={session.focusTitle}
+          material={session.material}
+          task={task}
+          onOpenSettings={voice.onOpenSettings}
+        />
       ) : null}
     </div>
   );

@@ -22,10 +22,14 @@ export async function requestVoiceTutorReply(
   model: string,
   history: ChatMessage[],
   signal?: AbortSignal,
+  extraContext?: string,
 ): Promise<string> {
   const trimmed = history.slice(-CONTEXT_MESSAGE_LIMIT);
+  const system = extraContext
+    ? `${VOICE_TUTOR_SYSTEM_PROMPT}\n\nКонтекст поточного заняття учня:\n${extraContext}`
+    : VOICE_TUTOR_SYSTEM_PROMPT;
   return requestChatCompletion(apiKey, model, [
-    { role: 'system', content: VOICE_TUTOR_SYSTEM_PROMPT },
+    { role: 'system', content: system },
     ...trimmed,
   ], signal);
 }
