@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useState, type FormEvent } from 'react';
-import { Loader2, Play, Shuffle, Sparkles } from 'lucide-react';
+import { GraduationCap, Loader2, Play, Shuffle, Sparkles } from 'lucide-react';
 import { AiThinking } from '@/components/common/AiThinking';
 import { LEVEL_LABELS } from '@/lib/localLesson';
 import { QUESTION_COUNTS, type LessonFocus, type Level, type QuestionCount, type SubjectContent } from '@/types/learning';
@@ -16,6 +16,9 @@ interface LessonSetupProps {
   onFocusChange: (focus: LessonFocus) => void;
   onLevelChange: (level: Level) => void;
   onQuestionCountChange: (count: QuestionCount) => void;
+  /** Екзаменаційний режим: таймер, без конспекту й підказок, ×2 бали. */
+  exam: boolean;
+  onExamChange: (exam: boolean) => void;
   onStart: () => void;
   onCustomTopic: (query: string) => void;
 }
@@ -35,6 +38,8 @@ export function LessonSetup({
   onFocusChange,
   onLevelChange,
   onQuestionCountChange,
+  exam,
+  onExamChange,
   onStart,
   onCustomTopic,
 }: LessonSetupProps) {
@@ -181,6 +186,40 @@ export function LessonSetup({
         </p>
       </div>
 
+      {/* Екзаменаційний режим */}
+      <button
+        type="button"
+        onClick={() => onExamChange(!exam)}
+        aria-pressed={exam}
+        className={`relative mt-6 flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all duration-300 ${
+          exam
+            ? 'border-danger/45 bg-danger/[0.07] shadow-[0_0_24px_-8px_rgba(244,63,94,0.4)]'
+            : 'border-white/10 bg-canvas/60 hover:border-white/20'
+        }`}
+      >
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors duration-300 ${
+            exam ? 'bg-danger/15 text-rose-200 ring-danger/40' : 'bg-white/[0.06] text-silver ring-white/10'
+          }`}
+        >
+          <GraduationCap className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">Екзаменаційний режим</span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-silver">
+            60 с на завдання, без конспекту, калькулятора й помічника. Подвійні бали.
+          </span>
+        </span>
+        <span
+          aria-hidden="true"
+          className={`relative h-6 w-10 shrink-0 rounded-full p-0.5 transition-colors duration-300 ${exam ? 'bg-danger/70' : 'bg-white/10'}`}
+        >
+          <span
+            className={`block h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${exam ? 'translate-x-4' : ''}`}
+          />
+        </span>
+      </button>
+
       {isLoading ? (
         <div className="relative mt-6 animate-fade-up rounded-xl border border-sky-400/20 bg-canvas/60 p-4 text-sky-100">
           <AiThinking />
@@ -199,7 +238,7 @@ export function LessonSetup({
 
       <button type="button" onClick={onStart} disabled={isLoading} className="btn-primary group relative mt-8 w-full">
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
-        {isLoading ? 'AI-наставник готує заняття...' : 'Розпочати навчання'}
+        {isLoading ? 'AI-наставник готує заняття...' : exam ? 'Розпочати екзамен' : 'Розпочати навчання'}
       </button>
     </section>
   );

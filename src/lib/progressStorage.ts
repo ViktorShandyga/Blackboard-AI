@@ -90,6 +90,8 @@ export function recordLesson(
   subjectId: SubjectId,
   results: TaskResult[],
   tasks: TaskTimingInput[] = [],
+  /** Екзаменаційний режим: подвійні бали за кожну правильну відповідь. */
+  exam = false,
 ): Progress {
   const correct = results.filter((r) => r.correct).length;
   const subject = progress.bySubject[subjectId] ?? { answered: 0, correct: 0 };
@@ -117,7 +119,8 @@ export function recordLesson(
     : [...progress.activeDays, today].sort();
 
   return {
-    totalPoints: progress.totalPoints + correct * POINTS_PER_CORRECT,
+    totalPoints:
+      progress.totalPoints + correct * POINTS_PER_CORRECT * (exam ? 2 : 1),
     lessonsCompleted: progress.lessonsCompleted + 1,
     answered: progress.answered + results.length,
     correct: progress.correct + correct,

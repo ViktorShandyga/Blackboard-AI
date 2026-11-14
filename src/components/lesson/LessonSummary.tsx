@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { CheckCircle2, RotateCcw, Trophy, XCircle, Target, Layers } from 'lucide-react';
+import { CheckCircle2, GraduationCap, RefreshCcw, RotateCcw, Trophy, XCircle, Target, Layers, Timer } from 'lucide-react';
 import { CountUp } from '@/components/common/CountUp';
 import { AiCompanion } from '@/components/lesson/AiCompanion';
 import { accuracyPercent, POINTS_PER_CORRECT } from '@/lib/progressStorage';
@@ -11,23 +11,34 @@ interface LessonSummaryProps {
   results: TaskResult[];
   isLoading: boolean;
   onRetry: () => void;
+  /** Міні-сесія лише з завдань, у яких були помилки. */
+  onRetryMistakes: () => void;
   onChooseAnother: () => void;
 }
 
-function summaryHeadline(accuracy: number): string {
+function summaryHeadline(accuracy: number, exam: boolean): string {
+  if (exam) {
+    if (accuracy >= 90) return 'Екзамен здано блискуче!';
+    if (accuracy >= 60) return 'Екзамен складено!';
+    return 'Наступного разу складеш';
+  }
   if (accuracy >= 90) return 'Оце рівень!';
   if (accuracy >= 60) return 'Файний результат!';
   return 'Не здавайся, ти вже на шляху';
 }
 
-export function LessonSummary({ session, results, isLoading, onRetry, onChooseAnother }: LessonSummaryProps) {
+export function LessonSummary({ session, results, isLoading, onRetry, onRetryMistakes, onChooseAnother }: LessonSummaryProps) {
   const correctCount = results.filter((result) => result.correct).length;
+  const mistakeCount = results.length - correctCount;
   const accuracy = accuracyPercent(correctCount, results.length);
-  const points = correctCount * POINTS_PER_CORRECT;
+  const exam = session.exam === true;
+  const points = correctCount * POINTS_PER_CORRECT * (exam ? 2 : 1);
+  const spentSeconds = results.reduce((sum, result) => sum + result.seconds, 0);
+  const spentClock = `${String(Math.floor(spentSeconds / 60)).padStart(2, '0')}:${String(spentSeconds % 60).padStart(2, '0')}`;
 
   const stats = [
     { icon: Target, label: 'Точність', value: accuracy, suffix: '%', tone: 'text-sky-300' },
-    { icon: Trophy, label: 'Отримано балів', value: points, suffix: '', tone: 'text-violet-300' },
+    { icon: Trophy, label: exam ? 'Отримано балів (×2)' : 'Отримано балів', value: points, suffix: '', tone: 'text-violet-300' },
     { icon: Layers, label: 'Правильних', value: correctCount, suffix: ` з ${results.length}`, tone: 'text-teal-300' },
   ];
 
@@ -39,13 +50,25 @@ export function LessonSummary({ session, results, isLoading, onRetry, onChooseAn
           <p className="text-xs uppercase tracking-widest text-silver">
             {session.subjectName} · {session.focusTitle}
           </p>
+          {exam ? (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <span className="badge border-danger/35 bg-danger/10 text-rose-200">
+                <GraduationCap className="h-3.5 w-3.5" />
+                Екзаменаційний режим · подвійні бали
+              </span>
+              <span className="badge border-white/[0.08] bg-white/[0.04] text-silver">
+                <Timer className="h-3.5 w-3.5" />
+                Час: {spentClock}
+              </span>
+            </div>
+          ) : null}
           <motion.h2
             initial={{ opacity: 0, y: 14, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="mt-3 text-2xl font-semibold sm:text-3xl"
           >
-            {summaryHeadline(accuracy)}
+            {summaryHeadline(accuracy, exam)}
           </motion.h2>
           <p className="mt-2 text-sm text-sky-300">{masteryLabel(accuracy)} засвоєння теми</p>
 
@@ -116,6 +139,12 @@ export function LessonSummary({ session, results, isLoading, onRetry, onChooseAn
           <RotateCcw className="h-4 w-4" />
           Пройти ще раз з новими питаннями
         </button>
+        {mistakeCount > 0 ? (
+          <button type="button" onClick={onRetryMistakes} className="btn-secondary border-danger/35 text-rose-200 hover:border-danger/60">
+            <RefreshCcw className="h-4 w-4" />
+            Повторити помилки ({mistakeCount})
+          </button>
+        ) : null}
         <button type="button" onClick={onChooseAnother} className="btn-secondary">
           Обрати іншу тему
         </button>

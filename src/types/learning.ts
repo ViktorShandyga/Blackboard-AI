@@ -19,6 +19,9 @@ export type Level = 'easy' | 'medium' | 'hard';
 export const QUESTION_COUNTS = [5, 10, 15, 20, 30] as const;
 export type QuestionCount = (typeof QUESTION_COUNTS)[number];
 
+/** Скільки секунд дається на одне завдання в екзаменаційному режимі. */
+export const EXAM_SECONDS_PER_TASK = 60;
+
 export interface Question {
   id: string;
   difficulty: Level;
@@ -72,6 +75,8 @@ export interface LessonSession {
   source: 'ai' | 'local';
   material: MaterialSection[];
   tasks: LessonTask[];
+  /** Екзаменаційний режим: таймер, без конспекту й підказок, ×2 бали. */
+  exam?: boolean;
 }
 
 export interface TaskResult {

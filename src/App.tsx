@@ -11,6 +11,7 @@ import { LessonSummary } from '@/components/lesson/LessonSummary';
 import { MusicPlayer } from '@/components/music/MusicPlayer';
 import { NotesPage } from '@/components/notes/NotesPage';
 import { SettingsModal } from '@/components/settings/SettingsModal';
+import { BackgroundPicker } from '@/components/settings/BackgroundPicker';
 import { TopBar } from '@/components/layout/TopBar';
 import { getSubject } from '@/data/lessons';
 import { clearApiKey, loadApiKey, saveApiKey } from '@/lib/apiKeyStorage';
@@ -19,6 +20,11 @@ import { generateAiLesson } from '@/lib/lessonAi';
 import { DEFAULT_MODEL_ID, loadModelId, saveModelId } from '@/lib/openrouterModels';
 import { CALCULATOR_XP_COST } from '@/lib/calculator';
 import { dateKey, loadProgress, recordLesson, saveProgress, type Progress } from '@/lib/progressStorage';
+import {
+  loadBackgroundTheme,
+  saveBackgroundTheme,
+  type BackgroundTheme,
+} from '@/lib/backgroundThemes';
 import { VoiceAIPage } from '@/components/voice/VoiceAIPage';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import type {
@@ -54,6 +60,9 @@ export default function App() {
   const lastFailedAttempt = useRef<(() => void) | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMusicOpen, setIsMusicOpen] = useState(false);
+  const [isBackgroundOpen, setIsBackgroundOpen] = useState(false);
+  const [background, setBackground] = useState<BackgroundTheme>(loadBackgroundTheme);
+  const [isExam, setIsExam] = useState(false);
   const player = useMusicPlayer();
   const [achievementToasts, setAchievementToasts] = useState<Achievement[]>([]);
   const progressScanCount = useRef(0);
@@ -126,7 +135,7 @@ export default function App() {
       return;
     }
     setErrorMessage(null);
-    setScreen({ kind: 'lesson', session });
+    setScreen({ kind: 'lesson', session: { ...session, exam: isExam } });
   };
 
   const startLesson = async (subject: SubjectContent, lessonFocus: LessonFocus, previousTaskIds: string[] = []) => {
@@ -145,7 +154,7 @@ export default function App() {
     const timeoutId = window.setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
     try {
       const session = await generateAiLesson(apiKey.trim(), model, subject, lessonFocus, level, questionCount, controller.signal);
-      setScreen({ kind: 'lesson', session });
+      setScreen({ kind: 'lesson', session: { ...session, exam: isExam } });
     } catch {
       if (model !== DEFAULT_MODEL_ID) {
         const fallbackController = new AbortController();
@@ -162,7 +171,7 @@ export default function App() {
           );
           setModel(DEFAULT_MODEL_ID);
           saveModelId(DEFAULT_MODEL_ID);
-          setScreen({ kind: 'lesson', session: fallbackSession });
+          setScreen({ kind: 'lesson', session: { ...fallbackSession, exam: isExam } });
           return;
         } catch {
           // Continue with local materials when both AI attempts fail.
@@ -220,7 +229,7 @@ export default function App() {
 
   const handleFinish = (results: TaskResult[]) => {
     if (screen.kind !== 'lesson') return;
-    const recorded = recordLesson(progress, screen.session.subjectId, results, screen.session.tasks);
+    const recorded = recordLesson(progress, screen.session.subjectId, results, screen.session.tasks, screen.session.exam === true);
     const { progress: next, completed } = applyDailyQuestRewards(recorded);
     setProgress(next);
     saveProgress(next);
@@ -244,6 +253,22 @@ export default function App() {
     const subject = getSubject(screen.session.subjectId);
     if (!subject) return;
     void startLesson(subject, focus, screen.session.tasks.map((task) => task.id));
+  };
+
+  /** Міні-сесія лише з завдань, де були помилки (без AI — беремо ті самі завдання). */
+  const handleRetryMistakes = () => {
+    if (screen.kind !== 'summary') return;
+    const failed = screen.session.tasks.filter((task, index) => screen.results[index] && !screen.results[index].correct);
+    if (failed.length === 0) return;
+    setScreen({
+      kind: 'lesson',
+      session: {
+        ...screen.session,
+        focusTitle: `${screen.session.focusTitle} · повторення помилок`,
+        tasks: failed,
+        exam: false,
+      },
+    });
   };
 
   const handleErrorRetry = () => {
@@ -287,11 +312,28 @@ export default function App() {
     <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-48 left-1/2 h-[620px] w-[900px] -translate-x-1/2 rounded-full bg-sky-500/15 blur-[130px] animate-aurora" />
-        <div className="absolute top-[20%] left-[-12%] h-[520px] w-[560px] rounded-full bg-indigo-500/15 blur-[120px] animate-aurora [animation-delay:-8s]" />
-        <div className="absolute -bottom-48 right-[-14%] h-[560px] w-[680px] rounded-full bg-violet-600/15 blur-[130px] animate-aurora [animation-delay:-4s]" />
-        <div className="absolute bottom-[-24%] left-[16%] h-[380px] w-[480px] rounded-full bg-teal-400/10 blur-[110px] animate-aurora [animation-delay:-14s]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(99,102,241,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.045)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_top,black,transparent_72%)]" />
+        <div
+          className="absolute -top-48 left-1/2 h-[620px] w-[900px] -translate-x-1/2 rounded-full blur-[130px] animate-aurora transition-[background-color] duration-700"
+          style={{ backgroundColor: background.blobs[0] }}
+        />
+        <div
+          className="absolute top-[20%] left-[-12%] h-[520px] w-[560px] rounded-full blur-[120px] animate-aurora [animation-delay:-8s] transition-[background-color] duration-700"
+          style={{ backgroundColor: background.blobs[1] }}
+        />
+        <div
+          className="absolute -bottom-48 right-[-14%] h-[560px] w-[680px] rounded-full blur-[130px] animate-aurora [animation-delay:-4s] transition-[background-color] duration-700"
+          style={{ backgroundColor: background.blobs[2] }}
+        />
+        <div
+          className="absolute bottom-[-24%] left-[16%] h-[380px] w-[480px] rounded-full blur-[110px] animate-aurora [animation-delay:-14s] transition-[background-color] duration-700"
+          style={{ backgroundColor: background.blobs[3] }}
+        />
+        <div
+          className="absolute inset-0 bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_top,black,transparent_72%)] transition-[background-image] duration-700"
+          style={{
+            backgroundImage: `linear-gradient(hsla(${background.gridHue}, 90%, 65%, 0.045) 1px, transparent 1px), linear-gradient(90deg, hsla(${background.gridHue}, 90%, 65%, 0.045) 1px, transparent 1px)`,
+          }}
+        />
         <div className="absolute inset-0 bg-noise" />
       </div>
 
@@ -304,6 +346,7 @@ export default function App() {
         onOpenNotes={handleOpenNotes}
         onOpenMusic={() => setIsMusicOpen(true)}
         onOpenVoice={handleOpenVoice}
+        onOpenBackground={() => setIsBackgroundOpen(true)}
       />
 
       <main className="relative mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
@@ -327,11 +370,13 @@ export default function App() {
                 focus={focus}
                 level={level}
                 questionCount={questionCount}
+                exam={isExam}
                 isLoading={isLoading}
                 onSelectSubject={handleSelectSubject}
                 onFocusChange={setFocus}
                 onLevelChange={setLevel}
                 onQuestionCountChange={setQuestionCount}
+                onExamChange={setIsExam}
                 onStart={handleStart}
             onSelectTopic={handleTopicSearch}
             onCustomTopic={handleCustomTopic}
@@ -370,6 +415,7 @@ export default function App() {
                 results={screen.results}
                 isLoading={isLoading}
                 onRetry={handleRetry}
+                onRetryMistakes={handleRetryMistakes}
                 onChooseAnother={() => setScreen({ kind: 'home' })}
               />
             ) : null}
@@ -386,6 +432,17 @@ export default function App() {
           onSave={handleSaveKey}
           onModelChange={handleModelChange}
           onClear={handleClearKey}
+        />
+      ) : null}
+
+      {isBackgroundOpen ? (
+        <BackgroundPicker
+          current={background}
+          onSelect={(theme) => {
+            setBackground(theme);
+            saveBackgroundTheme(theme);
+          }}
+          onClose={() => setIsBackgroundOpen(false)}
         />
       ) : null}
 

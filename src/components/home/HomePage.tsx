@@ -16,11 +16,13 @@ interface HomePageProps {
   focus: LessonFocus;
   level: Level;
   questionCount: QuestionCount;
+  exam: boolean;
   isLoading: boolean;
   onSelectSubject: (id: SubjectId) => void;
   onFocusChange: (focus: LessonFocus) => void;
   onLevelChange: (level: Level) => void;
   onQuestionCountChange: (count: QuestionCount) => void;
+  onExamChange: (exam: boolean) => void;
   onStart: () => void;
   onSelectTopic: (subjectId: SubjectId, topicId: string) => void;
   onCustomTopic: (query: string) => void;
@@ -33,11 +35,13 @@ export function HomePage({
   focus,
   level,
   questionCount,
+  exam,
   isLoading,
   onSelectSubject,
   onFocusChange,
   onLevelChange,
   onQuestionCountChange,
+  onExamChange,
   onStart,
   onSelectTopic,
   onCustomTopic,
@@ -103,6 +107,8 @@ export function HomePage({
               onFocusChange={onFocusChange}
               onLevelChange={onLevelChange}
               onQuestionCountChange={onQuestionCountChange}
+              exam={exam}
+              onExamChange={onExamChange}
               onStart={onStart}
               onCustomTopic={onCustomTopic}
             />

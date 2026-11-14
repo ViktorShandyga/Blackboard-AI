@@ -1,15 +1,16 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, Bot, WifiOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bot, GraduationCap, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { AiCompanion } from '@/components/lesson/AiCompanion';
 import { CalculatorGate } from '@/components/lesson/CalculatorGate';
+import { ExamTimer } from '@/components/lesson/ExamTimer';
 import { LessonVoiceOrb } from '@/components/lesson/LessonVoiceOrb';
 import { LessonProgress } from '@/components/lesson/LessonProgress';
 import { MaterialCard } from '@/components/lesson/MaterialCard';
 import { StreakBadge } from '@/components/lesson/StreakBadge';
 import { TaskCard } from '@/components/lesson/TaskCard';
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds';
-import type { LessonSession, TaskResult } from '@/types/learning';
+import { EXAM_SECONDS_PER_TASK, type LessonSession, type TaskResult } from '@/types/learning';
 
 interface LessonViewProps {
   session: LessonSession;
@@ -104,11 +105,23 @@ export function LessonView({ session, onExit, onFinish, calculator, voice }: Les
             Завершити заняття
           </button>
           <div className="flex items-center gap-2">
+            {session.exam ? (
+              <span className="badge border-danger/35 bg-danger/10 text-rose-200">
+                <GraduationCap className="h-3.5 w-3.5" />
+                Екзамен ×2
+              </span>
+            ) : null}
             <StreakBadge streak={streak} />
             <span className="badge border-sky-400/25 bg-sky-400/[0.08] text-sky-200">
               {session.source === 'ai' ? <Bot className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
               {session.source === 'ai' ? 'AI-наставник' : 'Автономний режим'}
             </span>
+            {session.exam ? (
+              <ExamTimer
+                totalSeconds={session.tasks.length * EXAM_SECONDS_PER_TASK}
+                onExpire={() => onFinish(results)}
+              />
+            ) : null}
           </div>
         </div>
 
@@ -116,10 +129,17 @@ export function LessonView({ session, onExit, onFinish, calculator, voice }: Les
           {session.subjectName} · {session.focusTitle}
         </p>
         <LessonProgress total={total} current={index} results={results} />
-        <AiCompanion message={companionMessage(answered ? lastResult : undefined, streak)} />
+        {session.exam ? (
+          <p className="text-xs leading-relaxed text-rose-200/80">
+            Екзаменаційний режим: конспект приховано, калькулятор і голосовий помічник недоступні.
+            За кожну правильну відповідь — подвійні бали. Колись вичерпаєш час — тест завершиться сам.
+          </p>
+        ) : (
+          <AiCompanion message={companionMessage(answered ? lastResult : undefined, streak)} />
+        )}
       </div>
 
-      <MaterialCard sections={session.material} />
+      {!session.exam ? <MaterialCard sections={session.material} /> : null}
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
@@ -154,7 +174,7 @@ export function LessonView({ session, onExit, onFinish, calculator, voice }: Les
         </motion.div>
       ) : null}
 
-      {calculator && (calcUnlocked || seconds >= 15) ? (
+      {calculator && !session.exam && (calcUnlocked || seconds >= 15) ? (
         // Замок + 15 с — лише на першому завданні заняття; далі кнопка одразу.
         // Ключ = id завдання: XP-активація скидається на кожному новому завданні.
         <CalculatorGate
@@ -166,7 +186,7 @@ export function LessonView({ session, onExit, onFinish, calculator, voice }: Les
         />
       ) : null}
 
-      {voice ? (
+      {voice && !session.exam ? (
         <LessonVoiceOrb
           apiKey={voice.apiKey}
           model={voice.model}
