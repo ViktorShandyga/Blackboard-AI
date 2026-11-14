@@ -1,72 +1,72 @@
-import { supabase } from '@/lib/supabase';
 import type { NoteDraft, StudyNote } from '@/types/notes';
 
-interface StudyNoteRow {
-  id: string;
-  subject_id: string | null;
-  subject_name: string;
-  title: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
+/** Конспекти зберігаються локально в браузері (localStorage), без зовнішньої бази. */
+const NOTES_STORAGE_KEY = 'blackboard-ai:notes';
+
+function loadAll(): StudyNote[] {
+  try {
+    const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (note): note is StudyNote =>
+        typeof note?.id === 'string' &&
+        typeof note?.subjectName === 'string' &&
+        typeof note?.title === 'string' &&
+        typeof note?.content === 'string' &&
+        typeof note?.createdAt === 'string' &&
+        typeof note?.updatedAt === 'string',
+    );
+  } catch {
+    return [];
+  }
 }
 
-function mapNote(row: StudyNoteRow): StudyNote {
-  return {
-    id: row.id,
-    subjectId: row.subject_id,
-    subjectName: row.subject_name,
-    title: row.title,
-    content: row.content,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+function saveAll(notes: StudyNote[]): void {
+  window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+}
+
+function sortByUpdatedDesc(notes: StudyNote[]): StudyNote[] {
+  return [...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function loadNotes(): Promise<StudyNote[]> {
-  const { data, error } = await supabase
-    .from('study_notes')
-    .select('id, subject_id, subject_name, title, content, created_at, updated_at')
-    .order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data as StudyNoteRow[]).map(mapNote);
+  return sortByUpdatedDesc(loadAll());
 }
 
 export async function createNote(draft: NoteDraft): Promise<StudyNote> {
-  const { data, error } = await supabase
-    .from('study_notes')
-    .insert({
-      subject_id: draft.subjectId || null,
-      subject_name: draft.subjectName,
-      title: draft.title.trim(),
-      content: draft.content.trim(),
-    })
-    .select('id, subject_id, subject_name, title, content, created_at, updated_at')
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Конспект не створено');
-  return mapNote(data as StudyNoteRow);
+  const now = new Date().toISOString();
+  const note: StudyNote = {
+    id: `note-${now}-${Math.random().toString(36).slice(2, 8)}`,
+    subjectId: draft.subjectId || null,
+    subjectName: draft.subjectName,
+    title: draft.title.trim(),
+    content: draft.content.trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  saveAll([note, ...loadAll()]);
+  return note;
 }
 
 export async function updateNote(id: string, draft: NoteDraft): Promise<StudyNote> {
-  const { data, error } = await supabase
-    .from('study_notes')
-    .update({
-      subject_id: draft.subjectId || null,
-      subject_name: draft.subjectName,
-      title: draft.title.trim(),
-      content: draft.content.trim(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select('id, subject_id, subject_name, title, content, created_at, updated_at')
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Конспект не знайдено');
-  return mapNote(data as StudyNoteRow);
+  const notes = loadAll();
+  const index = notes.findIndex((note) => note.id === id);
+  if (index === -1) throw new Error('Конспект не знайдено');
+  const updated: StudyNote = {
+    ...notes[index],
+    subjectId: draft.subjectId || null,
+    subjectName: draft.subjectName,
+    title: draft.title.trim(),
+    content: draft.content.trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  notes[index] = updated;
+  saveAll(notes);
+  return updated;
 }
 
 export async function deleteNote(id: string): Promise<void> {
-  const { error } = await supabase.from('study_notes').delete().eq('id', id);
-  if (error) throw error;
+  saveAll(loadAll().filter((note) => note.id !== id));
 }
